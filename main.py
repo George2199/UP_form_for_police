@@ -129,10 +129,14 @@ class BarChart(QGraphicsView):
         bar_height = 30
         spacing = 10
 
+        dct = {
+                0: Qt.white,
+                1: Qt.blue,
+                2: Qt.red}
         for i, (label, value) in enumerate(data.items()):
-            bar_length = (value / max_value) * 400  # 400 - максимальная длина полосы
+            bar_length = (value / max_value) * 100  # 400 - максимальная длина полосы
             rect = QGraphicsRectItem(0, i * (bar_height + spacing), bar_length, bar_height)
-            rect.setBrush(Qt.green)
+            rect.setBrush(dct[i])
             self.scene.addItem(rect)
 
             text_item = QGraphicsTextItem(label)
@@ -167,18 +171,17 @@ class MainWindow(QMainWindow):
 
         # Данные для графика
         data = {
-            'Category A': 10,
-            'Category B': 20,
-            'Category C': 15,
-            'Category D': 25,
+            'Аварии': 10,
+            'Превышения скорости': 18,
+            'Нарушения разметки': 20,
         }
 
         # Добавляем график
         self.bar_chart = BarChart(data)
+        self.bar_chart.setAlignment(Qt.AlignTop)
         layout.addWidget(self.bar_chart)
-
         self.setStyleSheet('''
-        background-color: #0000FF;
+            background-color: #0000FF;
         ''')
 
 
