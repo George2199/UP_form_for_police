@@ -1,8 +1,11 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLineEdit, QPushButton, QLabel, QMessageBox, QMainWindow, QGraphicsView, QGraphicsScene, QGraphicsRectItem, QGraphicsTextItem, QHBoxLayout
+import pyodbc
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLineEdit, QPushButton, QLabel, QMessageBox, QMainWindow, QGraphicsView, QGraphicsScene, QGraphicsRectItem, QGraphicsTextItem, QHBoxLayout, QTableWidgetItem, QTableWidget
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QColor
+from datetime import datetime
+from PyQt5.QtGui import QColor, QFont
 
+CONNECTION_STRING = 'DRIVER={SQL Server};SERVER=ADCLG1;DATABASE=Денисов_УП;UID=;PWD='
 
 class CustomLabel(QLabel):
     def __init__(self, text, parent=None):
@@ -105,17 +108,47 @@ class MyForm(QWidget):
         self.main_window.show()
         self.close()
 
-    def try_enter(self):
+    def try_enter(self, db):
         login = self.login_input.text()
         password = self.password_input.text()
 
-        correct_login = "2"
-        correct_password = "2"
+        db_users = self.load_data('users')
 
-        if login == correct_login and password == correct_password:
-            self.enter()
-        else:
+        entered = False
+        for row in db_users:
+            if login == row['login'] and password == row['password']:
+                self.enter()
+                entered = True
+                break
+            else:
+                continue
+        if not entered:
             QMessageBox.warning(self, "Ошибка", "Неверный логин или пароль")
+            
+    def load_data(self, table_name):
+        # Подключение к базе данных
+        conn = pyodbc.connect(CONNECTION_STRING)
+        cursor = conn.cursor()
+
+        # Запрос данных из таблицы Cases
+        cursor.execute(f"SELECT * FROM {table_name}")
+        rows = cursor.fetchall()
+
+        # Получение названий столбцов
+        column_names = [column[0] for column in cursor.description]
+
+        # Создание списка словарей из данных
+        data_dicts = []
+        for row in rows:
+            data_dict = {column_names[col_idx]: row[col_idx] for col_idx in range(len(column_names))}
+            data_dicts.append(data_dict)
+
+        # Закрытие подключения
+        cursor.close()
+        conn.close()
+
+        # Возврат списка словарей
+        return data_dicts
 
 
 class BarChart(QGraphicsView):
@@ -136,13 +169,18 @@ class BarChart(QGraphicsView):
                 1: QColor(99, 81, 211),
                 2: Qt.red}
         for i, (label, value) in enumerate(data.items()):
-            bar_length = (value / max_value) * 100  # максимальная длина полосы
+            bar_length = (value / max_value) * 400  # максимальная длина полосы
             rect = QGraphicsRectItem(0, i * (bar_height + spacing), bar_length, bar_height)
             rect.setBrush(dct[i])
             self.scene.addItem(rect)
 
             text_item = QGraphicsTextItem(label)
             text_item.setPos(bar_length + 5, i * (bar_height + spacing))
+            
+            # Установка стиля текста
+            text_item.setDefaultTextColor(Qt.white)  # Цвет текста
+            text_item.setFont(QFont("Comic Sans MS", 16))  # Шрифт и размер текста
+            
             self.scene.addItem(text_item)
 
         self.scene.setSceneRect(0, 0, 500, len(data) * (bar_height + spacing))
@@ -155,28 +193,49 @@ class MainWindow(QMainWindow):
         top_widget = QWidget()
         self.setCentralWidget(top_widget)
 
+        self.table_widget = QTableWidget()
+        db_cases = self.load_data('Cases', True)
+        db_viols = self.load_data('Violations', False)
+
+        print(db_viols)
         # Главный горизонтальный макет
         main_layout = QHBoxLayout(top_widget)
+    
+        summ_date_diff = 0
+        values = {}
+        for i in db_cases:
+            id = db_viols[i['violation_id'] - 1]['violation_type']
+            if id in values.keys():
+                values[id] += 1
+            else:
+                values[id] = 1
+            diff = datetime.strptime(i['close_date'], '%Y-%m-%d') - datetime.strptime(i['open_date'], '%Y-%m-%d')
+            summ_date_diff += diff.days
 
         # Левый вертикальный макет для статистики
         stats_layout = QVBoxLayout()
-        n_closed_keys = 40
-        mean_time_case_close = 3
+        n_closed_keys = len(db_cases)
+        mean_time_case_close = summ_date_diff / len(db_cases)
 
         closed_cases_label = CustomLabel(f'Количество закрытых дел: {n_closed_keys}', self)
-        mean_time_case_label = CustomLabel(f'Среднее время закрытия дела: {mean_time_case_close}', self)
+        mean_time_case_label = CustomLabel(f'Среднее время закрытия дела: {mean_time_case_close} дней', self)
         case_types = CustomLabel(f'Типы дел: ', self)
 
         stats_layout.addWidget(closed_cases_label)
         stats_layout.addWidget(mean_time_case_label)
         stats_layout.addWidget(case_types)
 
-        # Данные для графика
-        data = {
-            'Аварии': 10,
-            'Превышения скорости': 18,
-            'Нарушения разметки': 20,
-        }
+
+        
+        nums = values
+        data = {}
+
+        for i in range(3):
+            if len(nums) <= 0:
+                break
+            ma = (max(values, key=nums.get))
+            data[ma + f', {nums[ma]}'] = nums[ma]
+            nums.pop(max(nums, key=nums.get), 3000)
 
         # Добавляем график
         self.bar_chart = BarChart(data)
@@ -188,18 +247,79 @@ class MainWindow(QMainWindow):
 
         # Правый вертикальный макет для поиска
         search_layout = QVBoxLayout()
+
         search = QLineEdit(self)
         search.setPlaceholderText("Поиск")
+
         search_layout.addWidget(search)
+        search_layout.addWidget(self.table_widget)
         search_layout.setAlignment(Qt.AlignTop)
 
         # Добавляем search_layout в правую часть главного макета
         main_layout.addLayout(search_layout)
 
+        self.table_widget.setStyleSheet("""
+            QTableWidget {
+                font-family: 'Comic Sans MS';
+                font-size: 16px;
+            }
+            QTableWidget::item {
+                padding: 5px;
+                background-color: white;
+            }
+            QHeaderView::section {
+                background-color: red;
+                color: white;
+                font-family: 'Comic Sans MS';
+                font-size: 20px;
+                padding: 5px;
+            }
+        """)
+
         self.setStyleSheet('''
             background-color: #0000FF;
-        ''')     
+        ''')
 
+        print(db_cases)
+
+    
+    def load_data(self, table_name, load_to_form):
+        # Подключение к базе данных
+        conn = pyodbc.connect(CONNECTION_STRING)
+        cursor = conn.cursor()
+
+        # Запрос данных из таблицы Cases
+        cursor.execute(f"SELECT * FROM {table_name}")
+        rows = cursor.fetchall()
+
+        # Получение названий столбцов
+        column_names = [column[0] for column in cursor.description]
+
+        # Создание списка словарей из данных
+        data_dicts = []
+        for row in rows:
+            data_dict = {column_names[col_idx]: row[col_idx] for col_idx in range(len(column_names))}
+            data_dicts.append(data_dict)
+
+        if load_to_form:
+            # Установка количества строк и столбцов в таблице
+            self.table_widget.setRowCount(len(rows))
+            self.table_widget.setColumnCount(len(column_names))
+
+            # Установка заголовков столбцов
+            self.table_widget.setHorizontalHeaderLabels(column_names)
+
+            # Заполнение таблицы данными
+            for row_idx, row in enumerate(rows):
+                for col_idx, value in enumerate(row):
+                    self.table_widget.setItem(row_idx, col_idx, QTableWidgetItem(str(value)))
+
+        # Закрытие подключения
+        cursor.close()
+        conn.close()
+
+        # Возврат списка словарей
+        return data_dicts
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
