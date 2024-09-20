@@ -1,6 +1,7 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLineEdit, QPushButton, QLabel, QMessageBox, QMainWindow, QGraphicsView, QGraphicsScene, QGraphicsRectItem, QGraphicsTextItem
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLineEdit, QPushButton, QLabel, QMessageBox, QMainWindow, QGraphicsView, QGraphicsScene, QGraphicsRectItem, QGraphicsTextItem, QHBoxLayout
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor
 
 
 class CustomLabel(QLabel):
@@ -123,6 +124,7 @@ class BarChart(QGraphicsView):
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
         self.create_bars(data)
+        self.setAlignment(Qt.AlignTop)
 
     def create_bars(self, data):
         max_value = max(data.values())
@@ -131,10 +133,10 @@ class BarChart(QGraphicsView):
 
         dct = {
                 0: Qt.white,
-                1: Qt.blue,
+                1: QColor(99, 81, 211),
                 2: Qt.red}
         for i, (label, value) in enumerate(data.items()):
-            bar_length = (value / max_value) * 100  # 400 - максимальная длина полосы
+            bar_length = (value / max_value) * 100  # максимальная длина полосы
             rect = QGraphicsRectItem(0, i * (bar_height + spacing), bar_length, bar_height)
             rect.setBrush(dct[i])
             self.scene.addItem(rect)
@@ -150,11 +152,13 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle('Система "ГАИ"')
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        layout = QVBoxLayout(central_widget)
+        top_widget = QWidget()
+        self.setCentralWidget(top_widget)
 
-        # Создаем вертикальный layout для меток
+        # Главный горизонтальный макет
+        main_layout = QHBoxLayout(top_widget)
+
+        # Левый вертикальный макет для статистики
         stats_layout = QVBoxLayout()
         n_closed_keys = 40
         mean_time_case_close = 3
@@ -166,8 +170,6 @@ class MainWindow(QMainWindow):
         stats_layout.addWidget(closed_cases_label)
         stats_layout.addWidget(mean_time_case_label)
         stats_layout.addWidget(case_types)
-        layout.addLayout(stats_layout)
-        layout.setAlignment(Qt.AlignTop)
 
         # Данные для графика
         data = {
@@ -178,11 +180,25 @@ class MainWindow(QMainWindow):
 
         # Добавляем график
         self.bar_chart = BarChart(data)
-        self.bar_chart.setAlignment(Qt.AlignTop)
-        layout.addWidget(self.bar_chart)
+        stats_layout.addWidget(self.bar_chart)
+        stats_layout.setAlignment(Qt.AlignTop)
+
+        # Добавляем stats_layout в левую часть главного макета
+        main_layout.addLayout(stats_layout)
+
+        # Правый вертикальный макет для поиска
+        search_layout = QVBoxLayout()
+        search = QLineEdit(self)
+        search.setPlaceholderText("Поиск")
+        search_layout.addWidget(search)
+        search_layout.setAlignment(Qt.AlignTop)
+
+        # Добавляем search_layout в правую часть главного макета
+        main_layout.addLayout(search_layout)
+
         self.setStyleSheet('''
             background-color: #0000FF;
-        ''')
+        ''')     
 
 
 if __name__ == "__main__":
