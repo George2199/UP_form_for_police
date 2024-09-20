@@ -108,7 +108,7 @@ class MyForm(QWidget):
         self.main_window.show()
         self.close()
 
-    def try_enter(self, db):
+    def try_enter(self):
         login = self.login_input.text()
         password = self.password_input.text()
 
@@ -195,15 +195,15 @@ class MainWindow(QMainWindow):
 
         self.table_widget = QTableWidget()
         db_cases = self.load_data('Cases', True)
+        closed_cases = [i for i in db_cases if i['status'] == 'Закрыто']
         db_viols = self.load_data('Violations', False)
 
-        print(db_viols)
         # Главный горизонтальный макет
         main_layout = QHBoxLayout(top_widget)
     
         summ_date_diff = 0
         values = {}
-        for i in db_cases:
+        for i in closed_cases:
             id = db_viols[i['violation_id'] - 1]['violation_type']
             if id in values.keys():
                 values[id] += 1
@@ -214,11 +214,11 @@ class MainWindow(QMainWindow):
 
         # Левый вертикальный макет для статистики
         stats_layout = QVBoxLayout()
-        n_closed_keys = len(db_cases)
+        n_closed_cases = len(closed_cases)
         mean_time_case_close = summ_date_diff / len(db_cases)
 
-        closed_cases_label = CustomLabel(f'Количество закрытых дел: {n_closed_keys}', self)
-        mean_time_case_label = CustomLabel(f'Среднее время закрытия дела: {mean_time_case_close} дней', self)
+        closed_cases_label = CustomLabel(f'Количество закрытых дел: {n_closed_cases}', self)
+        mean_time_case_label = CustomLabel(f'Среднее время закрытия дела: {int(mean_time_case_close)} дней', self)
         case_types = CustomLabel(f'Типы дел: ', self)
 
         stats_layout.addWidget(closed_cases_label)
@@ -279,8 +279,6 @@ class MainWindow(QMainWindow):
         self.setStyleSheet('''
             background-color: #0000FF;
         ''')
-
-        print(db_cases)
 
     
     def load_data(self, table_name, load_to_form):
