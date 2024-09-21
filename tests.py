@@ -3,7 +3,6 @@ from unittest.mock import patch, MagicMock
 from PyQt5.QtWidgets import QApplication
 import sys
 
-# Предполагается, что ваш файл называется main.py
 from main import MyForm
 
 class TestMyForm(unittest.TestCase):
@@ -18,13 +17,11 @@ class TestMyForm(unittest.TestCase):
         mock_cursor = MagicMock()
         mock_connect.return_value.cursor.return_value = mock_cursor
         
-        # Определяем, что должно вернуть выполнение запроса
         mock_cursor.fetchall.return_value = [(1, 'test_user', 'password'), (2, 'user2', 'pass2')]
         mock_cursor.description = [('id',), ('login',), ('password',)]
         
         data = self.form.load_data('users')
         
-        # Проверяем, что данные загружены правильно
         self.assertEqual(len(data), 2)
         self.assertEqual(data[0]['login'], 'test_user')
         self.assertEqual(data[1]['password'], 'pass2')
@@ -62,7 +59,6 @@ class TestMyForm(unittest.TestCase):
 
     @patch('main.pyodbc.connect')
     def test_load_data_empty_table(self, mock_connect):
-        # Настроим моки для возврата пустых данных
         mock_cursor = MagicMock()
         mock_connect.return_value.cursor.return_value = mock_cursor
         mock_cursor.fetchall.return_value = []
